@@ -1,0 +1,54 @@
+﻿@model List<BisleriumPvtLtd.Models.Blog>
+
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <button id="addBlogButton">Add Blog</button>
+</div>
+
+<div class="container mt-5">
+    <h2>Recent Blogs</h2>
+    @if (Model != null && Model.Any())
+    {
+        <div class="row">
+            @foreach (var blog in Model)
+            {
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <h5 class="card-title">@blog.Title</h5>
+                        <p class="card-text">@blog.Body</p>
+                        <img src="@blog.ImageUrl" class="card-img-top" alt="Blog Image">
+                        <div class="card-body">
+                            @if (blog.User != null)
+                            {
+                                <p class="card-text">Posted by: @blog.User.UserName </p>
+                            }
+                            <a href="@Url.Action("PreviewBlog", "Blog", new { id = blog.Id })" class="btn btn-primary">Read More</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p>No blogs found.</p>
+    }
+</div>
+
+@section scripts {
+    <script>
+        // Get the Add Blog button element
+        var addBlogButton = document.getElementById('addBlogButton');
+
+        // Add click event listener to the button
+        addBlogButton.addEventListener('click', function () {
+            // Redirect the user to the AddBlog page
+            window.location.href = '@Url.Action("AddBlog", "Blog")';
+        });
+    </script>
+}
