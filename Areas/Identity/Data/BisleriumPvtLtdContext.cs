@@ -14,7 +14,7 @@ public class BisleriumPvtLtdContext : IdentityDbContext<IdentityUser>
 
     }
     public DbSet<Blog> Blogs { get; set; }
-
+    public DbSet<Vote> Votes { get; set; }
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

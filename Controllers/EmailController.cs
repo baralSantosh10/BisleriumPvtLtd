@@ -1,9 +1,5 @@
-﻿using System.Net.Mail;
-using System.Net;
-using MailKit;
-using MailKit.Net.Smtp;
+﻿using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 using MimeKit;
 
 public class EmailController : Controller
@@ -19,13 +15,15 @@ public class EmailController : Controller
         if (string.IsNullOrEmpty(toEmail) || string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(body))
         {
             ModelState.AddModelError("", "Please provide all required fields.");
-            return View(); // Consider returning appropriate view here.
+            return View(); // Return the same view with validation errors
         }
+        Console.WriteLine(toEmail);
+        Console.WriteLine(subject);
 
         try
         {
             var email = new MimeMessage();
-            email.From.Add(new MailboxAddress("Sender Name", "sudipbhandari67@gmail.com"));
+            email.From.Add(new MailboxAddress("Sender Name", "baralsantos10@gmail.com"));
             email.To.Add(new MailboxAddress("Receiver Name", toEmail));
             email.Subject = subject;
             email.Body = new TextPart("plain")
@@ -33,23 +31,22 @@ public class EmailController : Controller
                 Text = body
             };
 
-            using (var smtp = new MailKit.Net.Smtp.SmtpClient())
+            using (var smtp = new SmtpClient())
             {
                 smtp.Connect("smtp.gmail.com", 587, false);
-                smtp.Authenticate("baralsantos10@gmail.com", "xyzkilluhh987065");
+                smtp.Authenticate("baralsantos10@gmail.com", "fwoizvvdwedvtbrn");
                 smtp.Send(email);
                 smtp.Disconnect(true);
             }
 
-            return View("Index"); // Return success view
+         
+            return RedirectToAction("Index", "Home");
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            Console.WriteLine(ex.Message);
             ModelState.AddModelError("", $"Failed to send email: {ex.Message}");
-            return View(); // Consider returning appropriate view here.
+            return View(); // Return the same view with error message
         }
-
     }
 }
- 

@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Http;
 using System.Reflection.Metadata;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.CodeAnalysis.Elfie.Serialization;
 public class BlogController : Controller
 {
     private readonly BisleriumPvtLtdContext _context;
@@ -20,8 +22,22 @@ public class BlogController : Controller
         _environment = environment;
 
     }
+    public async Task<IActionResult> Index()
+    {
+        var blogVoteCounts = _context.Votes
+    .GroupBy(v => v.Id)
+    .Select(group => new {
+        Id = group.Key,
+        Upvotes = group.Count(v => v.IsUpvote),
+        Downvotes = group.Count(v => !v.IsUpvote)
+    })
+    .ToList();
+
+        return View(blogVoteCounts);
+    }
 
     [HttpGet]
+    [Authorize]
     public IActionResult AddBlog()
     {
         return View();
@@ -29,7 +45,7 @@ public class BlogController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize] // Ensure the user is authenticated
+     
     public async Task<IActionResult> AddBlog(BlogCreateViewModel model)
     {
         if (!ModelState.IsValid)
@@ -37,13 +53,13 @@ public class BlogController : Controller
             return View(model);
         }
 
-        // Retrieve user ID
+      
         var userId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        // Check if user ID exists
+    
         if (userId == null)
         {
-            return RedirectToAction("Login", "Account"); // Redirect to login page if user is not authenticated
+            return RedirectToAction("Login", "Account");
         }
 
         string imageUrl = null;
@@ -63,10 +79,11 @@ public class BlogController : Controller
 
         Blog blog = new Blog
         {
-            UserId = userId, // Assign user ID to the blog
+            UserId = userId,
             Title = model.Title,
             Body = model.Body,
             ImageUrl = imageUrl,
+            
             CreatedAt = DateTime.Now,
             UpdatedAt = DateTime.Now
         };
@@ -74,7 +91,7 @@ public class BlogController : Controller
         _context.Blogs.Add(blog);
         await _context.SaveChangesAsync();
 
-        // Redirect to the list of blogs after adding a new blog
+        
         return RedirectToAction("Index", "Home");
     }
 
@@ -124,5 +141,77 @@ public class BlogController : Controller
 
         return RedirectToAction("Index", "Home");
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [HttpPost]
+    [Authorize]
+    [HttpPost]
+    public async Task<IActionResult> Vote(int blogId, bool isUpvote)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // Update or insert the vote
+        var existingVote = await _context.Votes.FirstOrDefaultAsync(v => v.BlogId == blogId && v.UserId == userId);
+
+        if (existingVote != null)
+        {
+            existingVote.IsUpvote = isUpvote;
+        }
+        else
+        {
+            var vote = new Vote { BlogId = blogId, UserId = userId, IsUpvote = isUpvote };
+            _context.Votes.Add(vote);
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Calculate upvote and downvote counts
+        var upvotes = await _context.Votes.Where(v => v.BlogId == blogId && v.IsUpvote).CountAsync();
+        var downvotes = await _context.Votes.Where(v => v.BlogId == blogId && !v.IsUpvote).CountAsync();
+
+        // Return partial view with updated vote counts
+        return RedirectToAction("Index", "Home");
+    
+}
+
+
+
+
+
+
+
+[HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize] 
+    public async Task<IActionResult> AddComment(int blogId, string content)
+    {
+        var blog = await _context.Blogs.Include(b => b.Comments).FirstOrDefaultAsync(b => b.Id == blogId);
+        if (blog == null)
+        {
+            return NotFound();
+        }
+
+        var userId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+
+        var comment = new Comment
+        {
+            BlogId = blogId,
+            UserId = userId,
+            Content = content,
+            CreatedAt = DateTime.Now
+
+        };
+
+        blog.Comments.Add(comment);
+        await _context.SaveChangesAsync();
+
+        return PartialView("_CommentPartial", comment);
+    }
+
 }
 
