@@ -18,8 +18,8 @@ namespace BisleriumPvtLtd.Models
         public int? Downvotes { get; set; }
         public IdentityUser User { get; set; }
         public virtual ICollection<Vote> Votes { get; set; } = new List<Vote>();
-        public List<Comment> Comments { get; set; } = new List<Comment>();
-    
+        public ICollection<Comment> Comments { get; set; } = new List <Comment>();  
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
     }

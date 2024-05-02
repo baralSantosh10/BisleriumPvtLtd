@@ -142,16 +142,14 @@ public class BlogController : Controller
         return RedirectToAction("Index", "Home");
     }
 
+
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [HttpPost]
     [Authorize]
-    [HttpPost]
     public async Task<IActionResult> Vote(int blogId, bool isUpvote)
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        // Update or insert the vote
         var existingVote = await _context.Votes.FirstOrDefaultAsync(v => v.BlogId == blogId && v.UserId == userId);
 
         if (existingVote != null)
@@ -165,53 +163,19 @@ public class BlogController : Controller
         }
 
         await _context.SaveChangesAsync();
+        var blog = await _context.Blogs.Include(b => b.Votes).FirstOrDefaultAsync(b => b.Id == blogId);
+        var totalUpvotes = blog.Votes.Count(v => v.IsUpvote);
+        var totalDownvotes = blog.Votes.Count(v => !v.IsUpvote);
+        
+        blog.Upvotes = (int)totalUpvotes;
+        blog.Downvotes = (int)totalDownvotes;
 
-        // Calculate upvote and downvote counts
-        var upvotes = await _context.Votes.Where(v => v.BlogId == blogId && v.IsUpvote).CountAsync();
-        var downvotes = await _context.Votes.Where(v => v.BlogId == blogId && !v.IsUpvote).CountAsync();
-
-        // Return partial view with updated vote counts
-        return RedirectToAction("Index", "Home");
-    
-}
-
-
-
-
-
-
-
-[HttpPost]
-    [ValidateAntiForgeryToken]
-    [Authorize] 
-    public async Task<IActionResult> AddComment(int blogId, string content)
-    {
-        var blog = await _context.Blogs.Include(b => b.Comments).FirstOrDefaultAsync(b => b.Id == blogId);
-        if (blog == null)
-        {
-            return NotFound();
-        }
-
-        var userId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null)
-        {
-            return Unauthorized();
-        }
-
-        var comment = new Comment
-        {
-            BlogId = blogId,
-            UserId = userId,
-            Content = content,
-            CreatedAt = DateTime.Now
-
-        };
-
-        blog.Comments.Add(comment);
         await _context.SaveChangesAsync();
 
-        return PartialView("_CommentPartial", comment);
+        return RedirectToAction("Index", "Home");
     }
 
+
 }
+
 

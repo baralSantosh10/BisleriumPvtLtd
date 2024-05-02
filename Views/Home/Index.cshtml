@@ -1,5 +1,4 @@
 ﻿@using System.Security.Claims
-
 @model List<BisleriumPvtLtd.Models.Blog>
 
 @{
@@ -7,9 +6,8 @@
 }
 
 <style>
-   
     .blog-post {
-        background-color: #f8f9fa; 
+        background-color: #f8f9fa;
         border-radius: 10px;
         padding: 20px;
         margin-bottom: 20px;
@@ -18,7 +16,7 @@
 
     .blog-title {
         font-size: 1.5rem;
-        color: #007bff; 
+        color: #007bff;
         margin-bottom: 10px;
     }
 
@@ -29,7 +27,7 @@
 
     .blog-author {
         font-style: italic;
-        color: #666; 
+        color: #666;
         margin-bottom: 10px;
     }
 
@@ -41,138 +39,130 @@
     .btn-comment {
         margin-top: 10px;
     }
+
+    .comment {
+        margin-left: 20px;
+        border-left: 2px solid #007bff;
+        padding-left: 10px;
+        margin-bottom: 10px;
+    }
 </style>
-<head>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-</head>
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
     <button id="addBlogButton">Add Blog</button>
-        </div>
-        <div class="container mt-5">
-            <h2>Recent Blogs</h2>
-          @foreach (var blog in Model)
+</div>
+<div class="container mt-5">
+    <h2>Recent Blogs</h2>
+    @foreach (var blog in Model)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var hasVoted = blog.Votes.Any(v => v.UserId == userId);
+        var userVote = blog.Votes.FirstOrDefault(v => v.UserId == userId);
+
+        <div class="blog-post">
+            <h2 class="blog-title">@blog.Title</h2>
+            @if (!string.IsNullOrEmpty(blog.ImageUrl))
+            {
+                <img src="@blog.ImageUrl" alt="Blog Image" />
+            }
+            <p class="blog-content">@blog.Body</p>
+
+            @if (!hasVoted)
+            {
+                <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = true })">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success">👍 @blog.Upvotes</button>
+                </form>
+
+                <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = false })">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">👎 @blog.Downvotes</button>
+                </form>
+            }
+            else
+            {
+                var userIsUpvote = userVote.IsUpvote;
+
+                if (userIsUpvote)
                 {
-                   
-                        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                        var hasVoted = blog.Votes.Any(v => v.UserId == userId);
-                        var userVote = blog.Votes.FirstOrDefault(v => v.UserId == userId);
-                    
-
-                    <div>
-                        <h2>@blog.Title</h2>
-                        @if (!string.IsNullOrEmpty(blog.ImageUrl))
-                        {
-                            <img src="@blog.ImageUrl" alt="Blog Image" />
-                        }
-                                    <p>@blog.Body</p>
-                        
-
-                        @if (!hasVoted)
-                        {
-                            <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = true })">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-success">👍 @blog.Upvotes</button>
-                            </form>
-
-                            <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = false })">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-danger">👎 @blog.Downvotes</button>
-                            </form>
-                        }
-                        else
-                        {
-                            var userIsUpvote = userVote.IsUpvote;
-
-                            if (userIsUpvote)
-                            {
                     <button type="button" class="btn btn-success" disabled style="background-color: grey">👍 @blog.Upvotes</button>
-                                <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = false })">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-danger">👎 @blog.Downvotes</button>
-                                </form>
-                            }
-                            else
+                    <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = false })">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-danger">👎 @blog.Downvotes</button>
+                    </form>
+                }
+                else
+                {
+                    <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = true })">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success">👍 @blog.Upvotes</button>
+                    </form>
+                    <button type="button" class="btn btn-danger" disabled style="color: grey">👎 @blog.Downvotes</button>
+                }
+            }
+
+            <!-- Add comment section -->
+            <div class="comment-section">
+                <h3>Comments</h3>
+                <form method="post" action="@Url.Action("AddComment", "Comment")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="blogId" value="@blog.Id" />
+                    <div class="form-group">
+                        <textarea class="form-control" name="content" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Comment</button>
+
+                </form>
+              
+                @if (blog.Comments != null)
+                {
+                <!-- Display comments -->
+                @foreach (var comment in blog.Comments)
+                {
+                    <div class="comment">
+                        <p>@comment.Content</p>
+                            <p>@comment.CreatedAt</p>
+                            <!-- Upvote button -->
+                            <form method="post" action="@Url.Action("UpvoteComment", "Comment")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="commentId" value="@comment.Id" />
+                                <button type="submit" class="btn btn-success btn-sm">Upvote @comment.Upvotes</button>
+                            </form>
+                            <!-- Downvote button -->
+                            <form method="post" action="@Url.Action("DownvoteComment", "Comment")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="commentId" value="@comment.Id" />
+                                <button type="submit" class="btn btn-danger btn-sm">Downvote @comment.Downvotes</button>
+                            </form>
+                            @if (User.Identity.IsAuthenticated && comment.UserId == User.FindFirstValue(ClaimTypes.NameIdentifier))
                             {
-                                <form method="post" action="@Url.Action("Vote", "Blog", new { blogId = blog.Id, isUpvote = true })">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-success">👍 @blog.Upvotes</button>
-                                </form>
-                                <button type="button" class="btn btn-danger" disabled style="color: grey">👎 @blog.Downvotes</button>
+                                <!-- Edit and delete options for comment author -->
+                                <a href="@Url.Action("EditComment", "Comment", new { commentId = comment.Id })">Edit</a>
+ 
+                               <form method="post" action="@Url.Action("DeleteComment", "Comment")">
+                                   @Html.AntiForgeryToken()
+                                   <input type="hidden" name="commentId" value="@comment.Id" />
+                                   <button type="submit">Delete</button>
+                               </form>
                             }
-                        }
-                   </div>
-                }
-                </div>
-               
-
-
-@section scripts {
-    <script>
-        $(document).ready(function () {
-            // Handling voting
-            $('.btn-upvote, .btn-downvote').click(function () {
-                var button = $(this);
-                var blogId = button.data('blog-id');
-                var type = button.data('vote-type');
-                $.ajax({
-                    url: '@Url.Action("Vote", "Blog")',
-                    type: 'POST',
-                    data: {
-                        blogId: blogId,
-                        type: type
-                    },
-                    headers: {
-                        'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-                    },
-                    success: function (data) {
-                        if (data.upvotes !== undefined && data.downvotes !== undefined) {
-                            button.closest('.blog-post').find('.btn-upvote').text(`👍 ${data.upvotes}`);
-                            button.closest('.blog-post').find('.btn-downvote').text(`👎 ${data.downvotes}`);
-                        }
-                    },
-                    error: function (error) {
-                        console.error('Error voting:', error);
+                            <div class="reply-form">
+                                <form method="post" action="@Url.Action("AddComment", "Comment")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="blogId" value="@blog.Id" />
+                                    <input type="hidden" name="parentCommentId" value="@comment.Id" />
+                                    <div class="form-group">
+                                        <textarea class="form-control" name="content" rows="1" placeholder="Reply to this comment..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Reply</button>
+                                </form>
+                            </div>
+                            
+                        </div>
                     }
-                });
-            });
-
-            // Handling comments
-            $('.btn-comment').click(function () {
-                var button = $(this);
-                var blogId = button.data('blog-id');
-                var textarea = button.prev('textarea');
-                var commentContent = textarea.val();
-
-                if (commentContent) {
-                    $.ajax({
-                        url: '@Url.Action("AddComment", "Blog")', // Update this to your AddComment action
-                        type: 'POST',
-                        data: {
-                            blogId: blogId,
-                            content: commentContent
-                        },
-                        success: function (data) {
-                            // Refresh comment list or append new comment
-                            textarea.val(''); // Clear textarea after posting
-                        },
-                        error: function (error) {
-                            console.error('Error adding comment:', error);
-                        }
-                    });
-                } else {
-                    alert('Comment cannot be empty.');
+                
                 }
-            });
-        });
-
-        var addBlogButton = document.getElementById('addBlogButton');
-        addBlogButton.addEventListener('click', function () {
-            window.location.href = '@Url.Action("AddBlog", "Blog")';
-        });
-
-        
-   </script>
-}
-
+            </div>
+        </div>
+    }
+</div>

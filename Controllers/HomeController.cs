@@ -25,8 +25,13 @@ namespace BisleriumPvtLtd.Controllers
 
         public async Task<IActionResult> Index()
         {
-            var blogsWithUserInfo = await _context.Blogs.Include(b => b.User).ToListAsync();
-            return View(blogsWithUserInfo);
+            // Retrieve blogs along with their user info and comments
+            var blogsWithUserInfoAndComments = await _context.Blogs
+                .Include(b => b.User)
+                .Include(b => b.Comments)
+                .ToListAsync();
+
+            return View(blogsWithUserInfoAndComments);
         }
 
         public IActionResult Privacy()
