@@ -4,7 +4,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages;
+using System;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace BisleriumPvtLtd.Controllers
 {
@@ -30,8 +34,8 @@ namespace BisleriumPvtLtd.Controllers
                 return NotFound();
             }
 
-            var userId = _userManager.GetUserId(User);
-            if (userId == null)
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
             {
                 return Unauthorized();
             }
@@ -39,7 +43,7 @@ namespace BisleriumPvtLtd.Controllers
             var comment = new Comment
             {
                 BlogId = blogId,
-                UserId = userId,
+                UserId = user,
                 Content = content,
                 CreatedAt = DateTime.Now
             };
@@ -61,13 +65,14 @@ namespace BisleriumPvtLtd.Controllers
                 return NotFound();
             }
 
-            var userId = _userManager.GetUserId(User);
-            if (userId != comment.UserId)
+            var user = await _userManager.GetUserAsync(User);
+            if (user != comment.UserId)
             {
                 return Unauthorized();
             }
 
             comment.Content = newContent;
+            _context.Update(comment);
             await _context.SaveChangesAsync();
 
             return RedirectToAction("Index", "Home");
@@ -84,8 +89,8 @@ namespace BisleriumPvtLtd.Controllers
                 return NotFound();
             }
 
-            var userId = _userManager.GetUserId(User);
-            if (userId != comment.UserId)
+            var user = await _userManager.GetUserAsync(User);
+            if (user != comment.UserId)
             {
                 return Unauthorized();
             }
@@ -99,50 +104,50 @@ namespace BisleriumPvtLtd.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
-        public async Task<IActionResult> UpvoteComment(int commentId)
+        public async Task<IActionResult> VoteComment(int Id, bool isUpvote)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var existingVote = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId && c.UserId == userId && c.UserId != null);
 
+            // Find the comment by ID
+            var comment = await _context.Comments.FindAsync(Id);
+            if (comment == null)
+            {
+                // If comment is not found, return NotFound or handle the error appropriately
+                return NotFound();
+            }
+
+            // Check if the user has already voted on this comment
+            var existingVote = await _context.CommentVotes.FirstOrDefaultAsync(c => c.CommentId == Id && c.UserId == userId);
 
             if (existingVote != null)
             {
-                existingVote.IsUpvote = true;
+                // Update the existing vote
+                existingVote.IsUpvote = isUpvote;
             }
             else
             {
-                var vote = new Comment { Id = commentId, UserId = userId, IsUpvote = true };
-                _context.Comments.Add(vote);
+                // Create a new vote
+                var vote = new CommentVote { CommentId = Id, UserId = userId, IsUpvote = isUpvote };
+                _context.CommentVotes.Add(vote);
             }
+
+            await _context.SaveChangesAsync();
+
+            // Update the upvotes and downvotes count in the Comment table
+            var totalUpvotes = await _context.CommentVotes.CountAsync(v => v.CommentId == Id && v.IsUpvote);
+            var totalDownvotes = await _context.CommentVotes.CountAsync(v => v.CommentId == Id && !v.IsUpvote);
+
+            comment.Upvotes = totalUpvotes;
+            comment.Downvotes = totalDownvotes;
 
             await _context.SaveChangesAsync();
 
             return RedirectToAction("Index", "Home");
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public async Task<IActionResult> DownvoteComment(int commentId)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var existingVote = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId && c.UserId == userId && c.UserId != null);
 
 
-            if (existingVote != null)
-            {
-                existingVote.IsUpvote = false;
-            }
-            else
-            {
-                var vote = new Comment { Id = commentId, UserId = userId, IsUpvote = false };
-                _context.Comments.Add(vote);
-            }
 
-            await _context.SaveChangesAsync();
-
-            return RedirectToAction("Index", "Home");
-        }
 
 
         [HttpPost]
@@ -156,17 +161,17 @@ namespace BisleriumPvtLtd.Controllers
                 return NotFound();
             }
 
-            var userId = _userManager.GetUserId(User);
-            if (userId == null)
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
             {
                 return Unauthorized();
             }
 
             var reply = new Comment
             {
-                BlogId = parentComment.BlogId,
                
-                UserId = userId,
+                BlogId = parentComment.BlogId,
+                UserId = user,
                 Content = content,
                 CreatedAt = DateTime.Now
             };
@@ -177,51 +182,21 @@ namespace BisleriumPvtLtd.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public async Task<IActionResult> EditReply(int replyId, string newContent)
+        public async Task<bool> CanEditComment(int commentId)
         {
-            var reply = await _context.Comments.FindAsync(replyId);
-            if (reply == null)
+            var comment = await _context.Comments.FindAsync(commentId);
+            if (comment == null)
             {
-                return NotFound();
+                return false;
             }
 
-            var userId = _userManager.GetUserId(User);
-            if (userId != reply.UserId)
-            {
-                return Unauthorized();
-            }
-
-            reply.Content = newContent;
-            await _context.SaveChangesAsync();
-
-            return RedirectToAction("Index", "Home");
+            var user = await _userManager.GetUserAsync(User);
+            return user != null && user == comment.UserId;
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public async Task<IActionResult> DeleteReply(int replyId)
+        public async Task<int> CountVotes(int commentId, bool isUpvote)
         {
-            var reply = await _context.Comments.FindAsync(replyId);
-            if (reply == null)
-            {
-                return NotFound();
-            }
-
-            var userId = _userManager.GetUserId(User);
-            if (userId != reply.UserId)
-            {
-                return Unauthorized();
-            }
-
-            _context.Comments.Remove(reply);
-            await _context.SaveChangesAsync();
-
-            return RedirectToAction("Index", "Home");
+            return await _context.CommentVotes.Where(v => v.CommentId == commentId && v.IsUpvote == isUpvote).CountAsync();
         }
-
     }
 }

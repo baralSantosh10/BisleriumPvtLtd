@@ -50,7 +50,8 @@
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
-    <button id="addBlogButton">Add Blog</button>
+    <a id="addBlogButton" asp-area="" asp-controller="Blog" asp-action="AddBlog">Add Blog</a>
+
 </div>
 <div class="container mt-5">
     <h2>Recent Blogs</h2>
@@ -112,57 +113,66 @@
                         <textarea class="form-control" name="content" rows="3"></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary">Add Comment</button>
-
                 </form>
-              
+
                 @if (blog.Comments != null)
                 {
-                <!-- Display comments -->
-                @foreach (var comment in blog.Comments)
-                {
-                    <div class="comment">
-                        <p>@comment.Content</p>
+                    <!-- Display comments -->
+                    @foreach (var comment in blog.Comments)
+                    {
+                        <div class="comment">
+                            <p>@comment.Content</p>
                             <p>@comment.CreatedAt</p>
                             <!-- Upvote button -->
-                            <form method="post" action="@Url.Action("UpvoteComment", "Comment")">
+                            <form method="post" action="@Url.Action("VoteComment", "Comment")">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="commentId" value="@comment.Id" />
                                 <button type="submit" class="btn btn-success btn-sm">Upvote @comment.Upvotes</button>
                             </form>
                             <!-- Downvote button -->
-                            <form method="post" action="@Url.Action("DownvoteComment", "Comment")">
+                            <form method="post" action="@Url.Action("VoteComment", "Comment")">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="commentId" value="@comment.Id" />
                                 <button type="submit" class="btn btn-danger btn-sm">Downvote @comment.Downvotes</button>
                             </form>
-                            @if (User.Identity.IsAuthenticated && comment.UserId == User.FindFirstValue(ClaimTypes.NameIdentifier))
+                            <!-- Edit and delete options for comment author -->
+                            @if (User.Identity.IsAuthenticated && comment.UserId.Id == User.FindFirstValue(ClaimTypes.NameIdentifier))
                             {
-                                <!-- Edit and delete options for comment author -->
                                 <a href="@Url.Action("EditComment", "Comment", new { commentId = comment.Id })">Edit</a>
- 
-                               <form method="post" action="@Url.Action("DeleteComment", "Comment")">
-                                   @Html.AntiForgeryToken()
-                                   <input type="hidden" name="commentId" value="@comment.Id" />
-                                   <button type="submit">Delete</button>
-                               </form>
-                            }
-                            <div class="reply-form">
-                                <form method="post" action="@Url.Action("AddComment", "Comment")">
+
+                                <form method="post" action="@Url.Action("DeleteComment", "Comment")">
                                     @Html.AntiForgeryToken()
-                                    <input type="hidden" name="blogId" value="@blog.Id" />
-                                    <input type="hidden" name="parentCommentId" value="@comment.Id" />
+                                    <input type="hidden" name="commentId" value="@comment.Id" />
+                                    <button type="submit">Delete</button>
+                                </form>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+
+                           @*  <div class="reply-form">
+                                <form method="post" action="@Url.Action("AddReply", "Comment")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="Id" value="@comment.Id" />
                                     <div class="form-group">
                                         <textarea class="form-control" name="content" rows="1" placeholder="Reply to this comment..."></textarea>
                                     </div>
                                     <button type="submit" class="btn btn-primary">Reply</button>
-                                </form>
-                            </div>
-                            
+                                </form> 
+                            </div>*@
                         </div>
                     }
-                
                 }
             </div>
         </div>
     }
 </div>
+<script>
+    $(document).ready(function () {
+        $('#addBlogButton').click(function () {
+            window.location.href = '@Url.Action( "AddBlog", "Blog")'; 
+        });
+    });
+</script>

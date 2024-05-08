@@ -6,7 +6,11 @@ var connectionString = builder.Configuration.GetConnectionString("BisleriumPvtLt
 
 builder.Services.AddDbContext<BisleriumPvtLtdContext>(options => options.UseSqlServer(connectionString));
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true).AddEntityFrameworkStores<BisleriumPvtLtdContext>();
+
+builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<BisleriumPvtLtdContext>();
+
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -32,4 +36,46 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapRazorPages();
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+    var roles = new[] { "Admin", "Manager" };
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole(role));
+    }
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+    string email = "admin@admin.com";
+    string password = "Test@1234";
+    if (await userManager.FindByEmailAsync(email) == null)
+    {
+        var user = new IdentityUser();
+        user.UserName = email;
+        user.Email = email;
+        user.EmailConfirmed = true;
+        var result = await userManager.CreateAsync(user, password);
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(user, "Admin");
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                // Log or handle each error
+                Console.WriteLine(error.Description);
+            }
+        }
+
+    }
+
+}
+
 app.Run();

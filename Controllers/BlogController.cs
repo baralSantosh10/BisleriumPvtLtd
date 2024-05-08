@@ -11,16 +11,18 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.CodeAnalysis.Elfie.Serialization;
+using Microsoft.AspNetCore.Identity;
 public class BlogController : Controller
 {
     private readonly BisleriumPvtLtdContext _context;
     private readonly IWebHostEnvironment _environment;
+    private readonly SignInManager<IdentityUser> _signInManager;
 
-    public BlogController(BisleriumPvtLtdContext context, IWebHostEnvironment environment)
+    public BlogController(BisleriumPvtLtdContext context, IWebHostEnvironment environment , SignInManager<IdentityUser> signInManager)
     {
         _context = context;
         _environment = environment;
-
+        _signInManager = signInManager;
     }
     public async Task<IActionResult> Index()
     {
@@ -42,10 +44,6 @@ public class BlogController : Controller
     {
         return View();
     }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-     
     public async Task<IActionResult> AddBlog(BlogCreateViewModel model)
     {
         if (!ModelState.IsValid)
@@ -53,10 +51,10 @@ public class BlogController : Controller
             return View(model);
         }
 
-      
+
         var userId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    
+
         if (userId == null)
         {
             return RedirectToAction("Login", "Account");
@@ -83,7 +81,7 @@ public class BlogController : Controller
             Title = model.Title,
             Body = model.Body,
             ImageUrl = imageUrl,
-            
+
             CreatedAt = DateTime.Now,
             UpdatedAt = DateTime.Now
         };
@@ -91,35 +89,15 @@ public class BlogController : Controller
         _context.Blogs.Add(blog);
         await _context.SaveChangesAsync();
 
-        
+
         return RedirectToAction("Index", "Home");
     }
 
 
 
-
-    [HttpGet]
-    public IActionResult PreviewBlog(int id)
-    {
-        var blog = _context.Blogs.FirstOrDefault(b => b.Id == id);
-        if (blog == null)
-        {
-            return NotFound();
-        }
-
-        return View(blog);
-    }
-
-    [HttpGet]
-    public IActionResult ListBlogs()
-    {
-        var blogs = _context.Blogs.ToList();
-        return View(blogs);
-    }
-
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteBlog(int id)
+    public async Task<IActionResult> MarkAsDeleted(int id)
     {
         var blog = await _context.Blogs.FindAsync(id);
         if (blog == null)
@@ -127,20 +105,36 @@ public class BlogController : Controller
             return NotFound();
         }
 
-        if (!string.IsNullOrEmpty(blog.ImageUrl))
-        {
-            string filePath = Path.Combine(_environment.WebRootPath, "images", blog.ImageUrl);
-            if (System.IO.File.Exists(filePath))
-            {
-                System.IO.File.Delete(filePath);
-            }
-        }
-
-        _context.Blogs.Remove(blog);
+        blog.IsDeleted = true; // Mark the blog as deleted
         await _context.SaveChangesAsync();
 
-        return RedirectToAction("Index", "Home");
+        return RedirectToAction("Index", "Home"); // Redirect back to the index page
     }
+
+
+    public IActionResult AddedBlog()
+    {
+        if (_signInManager.IsSignedIn(User))
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var blogs = _context.Blogs.Where(b => b.UserId == userId && !b.IsDeleted).ToList();
+            var model = new AddedBlogModel { Blogs = blogs };
+            return View(model);
+        }
+        else
+        {
+            // Redirect to login page or handle unauthorized access
+            return RedirectToAction("Login", "Account");
+        }
+    }
+
+
+
+
+
+
+
+
 
 
     [HttpPost]
@@ -174,8 +168,104 @@ public class BlogController : Controller
 
         return RedirectToAction("Index", "Home");
     }
+    public async Task<IActionResult> Edit(int id)
+{
+    var blog = await _context.Blogs.FindAsync(id);
+    if (blog == null)
+    {
+        return NotFound();
+    }
+
+    var model = new BlogCreateViewModel
+    {
+        Id = blog.Id,
+        Title = blog.Title,
+        Body = blog.Body
+        // Include other properties as needed
+    };
+
+    return View(model);
+}
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, BlogCreateViewModel model)
+    {
+        if (id != model.Id)
+        {
+            return NotFound();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var blog = await _context.Blogs.FindAsync(id);
+        if (blog == null)
+        {
+            return NotFound();
+        }
+
+        // Update blog details
+        blog.Title = model.Title;
+        blog.Body = model.Body;
+
+        // Check if a new image is uploaded
+        if (model.Image != null && model.Image.Length > 0)
+        {
+            // Delete the existing image file
+            if (!string.IsNullOrEmpty(blog.ImageUrl))
+            {
+                string existingFilePath = Path.Combine(_environment.WebRootPath, blog.ImageUrl.TrimStart('/'));
+                if (System.IO.File.Exists(existingFilePath))
+                {
+                    System.IO.File.Delete(existingFilePath);
+                }
+            }
+
+            // Save the new image file
+            string newUniqueFileName = Guid.NewGuid().ToString() + "_" + Path.GetFileName(model.Image.FileName);
+            string newFilePath = Path.Combine(_environment.WebRootPath, "images", newUniqueFileName);
+
+            using (var fileStream = new FileStream(newFilePath, FileMode.Create))
+            {
+                await model.Image.CopyToAsync(fileStream);
+            }
+
+            blog.ImageUrl = "/images/" + newUniqueFileName;
+        }
+
+        // Save changes to the database
+        _context.Update(blog);
+        await _context.SaveChangesAsync();
+
+        return RedirectToAction("Index", "Home");
+    }
+
+
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        var blog = await _context.Blogs.FindAsync(id);
+        if (blog == null)
+        {
+            return NotFound();
+        }
+
+        blog.IsDeleted = true;
+        await _context.SaveChangesAsync();
+
+        return RedirectToAction("Index", "Blog");
+    }
+
+
 
 
 }
+
+
 
 

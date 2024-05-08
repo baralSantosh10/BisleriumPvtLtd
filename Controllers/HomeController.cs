@@ -1,5 +1,6 @@
 using BisleriumPvtLtd.Data;
 using BisleriumPvtLtd.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ namespace BisleriumPvtLtd.Controllers
             var blogsWithUserInfoAndComments = await _context.Blogs
                 .Include(b => b.User)
                 .Include(b => b.Comments)
+                .Where(b => !b.IsDeleted)
                 .ToListAsync();
 
             return View(blogsWithUserInfoAndComments);
@@ -44,5 +46,7 @@ namespace BisleriumPvtLtd.Controllers
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
         }
+       
+
     }
 }
